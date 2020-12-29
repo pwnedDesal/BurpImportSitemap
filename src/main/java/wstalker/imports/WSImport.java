@@ -112,29 +112,23 @@ public class WSImport {
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
         Document doc = dBuilder.parse(filename);
         doc.getDocumentElement().normalize();
-        stdout.println("Root element :" + doc.getDocumentElement().getNodeName());
-        NodeList nList = doc.getElementsByTagName("student");
+        stdout.println("Root element :" + doc.getDocumentElement().getNodeName()); //should `request`
+        NodeList nList = doc.getElementsByTagName("url");
+
         if ( filename.length() == 0 ) { // exit if no file selected
             return new ArrayList<IHttpRequestResponse>();
         }
-
-        lines = readFile(filename);//read the file. ang gawin dito read db TODO:
-        Iterator<String> i = lines.iterator();
-
-        while (i.hasNext()) {
-            try {
-                String line = i.next();
-                String[] v = line.split(","); // Format: "base64(request),base64(response),url"
-
-                byte[] request = helpers.base64Decode(v[0]);
-                byte[] response = helpers.base64Decode(v[1]);
-                String url = v[3];
-
+        for (int temp = 0; temp < nList.getLength(); temp++) {
+            Node nNode = nList.item(temp);
+            System.out.println("\nCurrent Element :" + nNode.getNodeName());
+            if (nNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element eElement = (Element) nNode;
+                String url=eElement.getAttribute("scheme") + "://" + eElement.getAttribute("host") + ":" +
+                        eElement.getAttribute("port") + eElement.getAttribute("path");
+                byte[] request=helpers.base64Decode(eElement.getElementsByTagName("request").item(0).getTextContent());
+                byte[] response=helpers.base64Decode(eElement.getElementsByTagName("response").item(0).getTextContent());
                 WSRequestResponse x = new WSRequestResponse(url, request, response);
                 requests.add(x);
-
-            } catch (Exception e) {
-                return new ArrayList<IHttpRequestResponse>();
             }
         }
 

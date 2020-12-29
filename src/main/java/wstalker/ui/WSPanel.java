@@ -19,6 +19,7 @@ import java.net.URL;
 import java.net.URISyntaxException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.UUID;
 
@@ -177,7 +178,7 @@ public class WSPanel extends JPanel {
         //import xml SHIT
         //
 
-        JLabel lblImportXML = new JLabel("Import XML file (\"export messages to file\")");
+        JLabel lblImportXML = new JLabel("Import XML file (\"import messages to file\")");
         gbc.insets = new Insets(20, 0, 5, 5);
         gbc.gridx = 1;
         gbc.gridy++;
@@ -281,6 +282,12 @@ public class WSPanel extends JPanel {
             String method = helpers.analyzeRequest(tmp[i].getRequest()).getMethod();
             String path = "/";
             String tmpStr = new String(tmp[i].getRequest());
+            //logs HTTP resquest and Response in base64
+            String encodedRequest = Base64.getEncoder().encodeToString(tmp[i].getRequest());
+            String encodedResponse="";
+            if(tmp[i].getResponse()!=null){
+                encodedResponse = Base64.getEncoder().encodeToString(tmp[i].getResponse());
+            }
             int firstslash = tmpStr.indexOf(" ");
             int secondslash = tmpStr.indexOf(" ", firstslash + 1);
             int questionmark = tmpStr.indexOf("?", firstslash + 1);
@@ -292,10 +299,10 @@ public class WSPanel extends JPanel {
             String host =  tmp[i].getHttpService().getHost();
             Output += "\t<url method=\"" + method + "\" scheme=\"" + protocol + "\" httpVersion=\"HTTP/1.1\" host=\"" + host + "\"  port=\"" + port + "\" path=\"" + path + "\">" +
                     "<request>" +
-                    tmp[i].getRequest() +
+                    encodedRequest +
                     "</request>" +
                     "<response>" +
-                    tmp[i].getResponse() +
+                    encodedResponse+
                     "</response>" +
                     "</url>\n";
         }
