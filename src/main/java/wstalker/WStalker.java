@@ -40,7 +40,7 @@ public class WStalker implements ITab, IBurpExtender, IContextMenuFactory {
     public void registerExtenderCallbacks(final IBurpExtenderCallbacks callbacks) {
         WStalker.instance = this;
         WStalker.callbacks = callbacks;
-        WStalker.panel = new wstalker.ui.WSPanel(WStalker.callbacks);
+        WStalker.panel = new wstalker.ui.WSPanel(WStalker.callbacks);//this is the UI
 
         callbacks.setExtensionName(WStalker.Name);
 

@@ -10,6 +10,10 @@ Released under AGPL see LICENSE for more information
 
 package wstalker.ui;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URISyntaxException;
@@ -18,11 +22,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.UUID;
 
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import javax.swing.*;
+import javax.xml.parsers.ParserConfigurationException;
 
 import java.awt.GridBagLayout;
 import java.awt.GridBagConstraints;
@@ -35,6 +36,7 @@ import burp.IBurpExtenderCallbacks;
 import burp.IHttpRequestResponse;
 import burp.IParameter;
 
+import org.xml.sax.SAXException;
 import wstalker.WStalker;
 import wstalker.imports.WSImport;
 import wstalker.imports.WSRequestResponse;
@@ -52,6 +54,29 @@ public class WSPanel extends JPanel {
         this.callbacks = callbacks;
         this.helpers = this.callbacks.getHelpers();
         this.wsimport = new WSImport();
+
+        JFileChooser fileChooser = new JFileChooser(){
+            @Override
+            public void approveSelection(){
+                File f = getSelectedFile();
+                if(f.exists() && getDialogType() == SAVE_DIALOG){
+                    int result = JOptionPane.showConfirmDialog(this,"The file exists, overwrite?","Existing file",JOptionPane.YES_NO_CANCEL_OPTION);
+                    switch(result){
+                        case JOptionPane.YES_OPTION:
+                            super.approveSelection();
+                            return;
+                        case JOptionPane.NO_OPTION:
+                            return;
+                        case JOptionPane.CLOSED_OPTION:
+                            return;
+                        case JOptionPane.CANCEL_OPTION:
+                            cancelSelection();
+                            return;
+                    }
+                }
+                super.approveSelection();
+            }
+        };
 
         // Create the Grid
         GridBagLayout gridBagLayout = new GridBagLayout();
@@ -149,6 +174,66 @@ public class WSPanel extends JPanel {
         this.add(btnImportZAP, gbc);
 
         //
+        //import xml SHIT
+        //
+
+        JLabel lblImportXML = new JLabel("Import XML file (\"export messages to file\")");
+        gbc.insets = new Insets(20, 0, 5, 5);
+        gbc.gridx = 1;
+        gbc.gridy++;
+        this.add(lblImportXML, gbc);
+
+        JButton btnImportXML = new JButton("Import XML file");
+        btnImportXML.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                ArrayList<IHttpRequestResponse> rs = null;
+                try {
+                    rs = wsimport.importXML();
+                } catch (ParserConfigurationException parserConfigurationException) {
+                    parserConfigurationException.printStackTrace();
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                } catch (SAXException saxException) {
+                    saxException.printStackTrace();
+                }
+                sendToSitemap(rs);
+            }
+        });
+        gbc.insets = new Insets(0, 0, 10, 0);
+        gbc.gridwidth = 2;
+        gbc.gridx = 1;
+        gbc.gridy++;
+        this.add(btnImportXML, gbc);
+
+        //
+        // Export xml
+        //
+
+        JLabel lblExportXML = new JLabel("Export XML Format");
+        gbc.insets = new Insets(20, 0, 5, 5);
+        gbc.gridx = 1;
+        gbc.gridy++;
+        this.add(lblExportXML, gbc);
+
+        JButton btnExportXML = new JButton("Export XML Format");
+        btnExportXML.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                IHttpRequestResponse[] tmp = callbacks.getSiteMap(null);
+                if (fileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION){
+                    File outputFile = fileChooser.getSelectedFile();
+                    writeStringToFile(createOutputForAppScanStandard(tmp), outputFile);
+                }
+            }
+        });
+        gbc.insets = new Insets(0, 0, 10, 0);
+        gbc.gridwidth = 2;
+        gbc.gridx = 1;
+        gbc.gridy++;
+        this.add(btnExportXML, gbc);
+
+
+
+        //
         // GO TO GITHUB
         //
 
@@ -169,6 +254,53 @@ public class WSPanel extends JPanel {
 		gbc.gridx = 1;
 		gbc.gridy++;
         this.add(btnGoToGithub, gbc);
+    }
+    public void writeStringToFile(String Output, File file){
+        BufferedWriter out = null;
+        try {
+            out = new BufferedWriter(new FileWriter(file));
+            out.write(Output);
+            JOptionPane.showMessageDialog(null, "File saved successfully.");
+        } catch ( IOException e1 ) {
+            JOptionPane.showMessageDialog(null, "Error saving file: " + e1.getMessage());
+        } finally {
+            try {
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public String createOutputForAppScanStandard(IHttpRequestResponse tmp[]){
+        callbacks.printOutput("OK, we called CreateOutput: " + tmp.length);
+        String Output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<requests>\n";
+        for(int i = 0; i < tmp.length; i++){
+            String protocol =  tmp[i].getHttpService().getProtocol();
+            String method = helpers.analyzeRequest(tmp[i].getRequest()).getMethod();
+            String path = "/";
+            String tmpStr = new String(tmp[i].getRequest());
+            int firstslash = tmpStr.indexOf(" ");
+            int secondslash = tmpStr.indexOf(" ", firstslash + 1);
+            int questionmark = tmpStr.indexOf("?", firstslash + 1);
+            if(questionmark < secondslash && questionmark > 0){
+                secondslash = questionmark;
+            }
+            path = tmpStr.substring(firstslash + 1, secondslash).replace("\"", "%22");
+            int port = tmp[i].getHttpService().getPort();
+            String host =  tmp[i].getHttpService().getHost();
+            Output += "\t<url method=\"" + method + "\" scheme=\"" + protocol + "\" httpVersion=\"HTTP/1.1\" host=\"" + host + "\"  port=\"" + port + "\" path=\"" + path + "\">" +
+                    "<request>" +
+                    tmp[i].getRequest() +
+                    "</request>" +
+                    "<response>" +
+                    tmp[i].getResponse() +
+                    "</response>" +
+                    "</url>\n";
+        }
+        Output += "</requests>";
+        return Output;
     }
 
     public void sendToSitemap(ArrayList<IHttpRequestResponse> rs) {    

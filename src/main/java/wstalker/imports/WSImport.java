@@ -10,10 +10,7 @@ Released under AGPL see LICENSE for more information
 
 package wstalker.imports;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
 import javax.swing.JFileChooser;
 import java.util.ArrayList;
@@ -22,8 +19,17 @@ import java.util.Iterator;
 import burp.IExtensionHelpers;
 import burp.IHttpRequestResponse;
 
+import org.xml.sax.SAXException;
 import wstalker.WStalker;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Node;
+import org.w3c.dom.Element;
 public class WSImport {
 
     public static String getLoadFile() {
@@ -70,9 +76,51 @@ public class WSImport {
             return new ArrayList<IHttpRequestResponse>();
         }
 
-        lines = readFile(filename);
+        lines = readFile(filename);//read the file. ang gawin dito read db TODO:
         Iterator<String> i = lines.iterator();
         
+        while (i.hasNext()) {
+            try {
+                String line = i.next();
+                String[] v = line.split(","); // Format: "base64(request),base64(response),url"
+
+                byte[] request = helpers.base64Decode(v[0]);
+                byte[] response = helpers.base64Decode(v[1]);
+                String url = v[3];
+
+                WSRequestResponse x = new WSRequestResponse(url, request, response);
+                requests.add(x);
+
+            } catch (Exception e) {
+                return new ArrayList<IHttpRequestResponse>();
+            }
+        }
+
+        return requests;
+    }
+    public static ArrayList<IHttpRequestResponse> importXML() throws ParserConfigurationException, IOException, SAXException {
+        ArrayList<String> lines = new ArrayList<String>();
+        ArrayList<IHttpRequestResponse> requests = new ArrayList<IHttpRequestResponse>();
+        IExtensionHelpers helpers = WStalker.callbacks.getHelpers();
+
+        String filename = getLoadFile();
+        PrintWriter stdout = new PrintWriter(WStalker.callbacks.getStdout(), true);
+        stdout.println(filename);
+
+        //reading xml file
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+        Document doc = dBuilder.parse(filename);
+        doc.getDocumentElement().normalize();
+        stdout.println("Root element :" + doc.getDocumentElement().getNodeName());
+        NodeList nList = doc.getElementsByTagName("student");
+        if ( filename.length() == 0 ) { // exit if no file selected
+            return new ArrayList<IHttpRequestResponse>();
+        }
+
+        lines = readFile(filename);//read the file. ang gawin dito read db TODO:
+        Iterator<String> i = lines.iterator();
+
         while (i.hasNext()) {
             try {
                 String line = i.next();
@@ -103,7 +151,8 @@ public class WSImport {
             return new ArrayList<IHttpRequestResponse>();
         }
 
-        lines = readFile(filename);
+        lines = readFile(filename);// change this to read xml file then create a iterator as well
+
         Iterator<String> i = lines.iterator();
 
         // Format:
@@ -137,7 +186,8 @@ public class WSImport {
 
                 // Add IHttpRequestResponse Object
                 WSRequestResponse x = new WSRequestResponse(url, req, res);
-                requests.add(x);
+                requests.add(x);//add new urls to the request array
+                WStalker.callbacks.issueAlert(requestBuffer);
 
                 // Reset content
                 isRequest = true;
